@@ -1,0 +1,164 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: chats
+    // Document ID: auto-generated
+    // Fields:
+    //   - userId: string (required, immutable) - The ID of the user who owns the chat
+    //   - title: string (required) - The title of the chat
+    //   - createdAt: timestamp (required, immutable) - When the chat was created
+    //   - updatedAt: timestamp (required) - When the chat was last updated
+    //
+    // Collection: chats/{chatId}/messages
+    // Document ID: auto-generated
+    // Fields:
+    //   - chatId: string (required, immutable) - The ID of the chat this message belongs to
+    //   - userId: string (required, immutable) - The ID of the user who owns the message
+    //   - role: string (required, enum: 'user', 'model') - The role of the message sender
+    //   - content: string (required) - The text content of the message
+    //   - createdAt: timestamp (required, immutable) - When the message was created
+    //
+    // Collection: tasks
+    // Document ID: auto-generated
+    // Fields:
+    //   - userId: string (required, immutable) - The ID of the user who owns the task
+    //   - title: string (required) - The title of the task
+    //   - description: string (optional) - The description of the task
+    //   - status: string (required, enum: 'pending', 'completed') - The status of the task
+    //   - dueDate: timestamp (optional) - The due date of the task
+    //   - isRecurring: bool (required) - Whether the task repeats
+    //   - recurrenceInterval: string (optional, enum: 'daily', 'weekly', 'monthly', 'custom') - How often the task repeats
+    //   - recurrenceValue: int (optional) - The value for custom recurrence intervals
+    //   - createdAt: timestamp (required, immutable) - When the task was created
+    //   - updatedAt: timestamp (required) - When the task was last updated
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+    
+    function uidUnchanged() {
+      return !('userId' in request.resource.data) || request.resource.data.userId == request.auth.uid;
+    }
+    
+    function uidNotModified() {
+      return !('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId;
+    }
+    
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+    
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    
+    function isValidChat(data) {
+      return hasOnlyAllowedFields(['userId', 'title', 'createdAt', 'updatedAt']) &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+    
+    function isValidMessage(data) {
+      return hasOnlyAllowedFields(['chatId', 'userId', 'role', 'content', 'createdAt']) &&
+             data.chatId is string && data.chatId.size() > 0 && data.chatId.size() < 100 &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
+             data.role in ['user', 'model'] &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 100000 &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidTask(data) {
+      return hasOnlyAllowedFields(['userId', 'title', 'description', 'status', 'dueDate', 'isRecurring', 'recurrenceInterval', 'recurrenceValue', 'createdAt', 'updatedAt']) &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             (!('description' in data) || (data.description is string && data.description.size() < 1000)) &&
+             data.status in ['pending', 'completed'] &&
+             (!('dueDate' in data) || data.dueDate is timestamp) &&
+             data.isRecurring is bool &&
+             (!('recurrenceInterval' in data) || data.recurrenceInterval in ['daily', 'weekly', 'monthly', 'custom']) &&
+             (!('recurrenceValue' in data) || data.recurrenceValue is int) &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /tasks/{taskId} {
+      allow read: if isAuthenticated() && isDocOwner();
+      allow create: if isAuthenticated() && 
+                    hasRequiredFields(['userId', 'title', 'status', 'isRecurring', 'createdAt', 'updatedAt']) &&
+                    isValidTask(request.resource.data) && 
+                    uidUnchanged();
+      allow update: if isAuthenticated() && 
+                    isDocOwner() &&
+                    hasRequiredFields(['userId', 'title', 'status', 'isRecurring', 'createdAt', 'updatedAt']) &&
+                    isValidTask(request.resource.data) && 
+                    uidNotModified() &&
+                    areImmutableFieldsUnchanged(['userId', 'createdAt']);
+      allow delete: if isAuthenticated() && isDocOwner();
+    }
+
+    match /chats/{chatId} {
+      allow read: if isAuthenticated() && isDocOwner();
+      allow create: if isAuthenticated() && 
+                    hasRequiredFields(['userId', 'title', 'createdAt', 'updatedAt']) &&
+                    isValidChat(request.resource.data) && 
+                    uidUnchanged();
+      allow update: if isAuthenticated() && 
+                    isDocOwner() &&
+                    hasRequiredFields(['userId', 'title', 'createdAt', 'updatedAt']) &&
+                    isValidChat(request.resource.data) && 
+                    uidNotModified() &&
+                    areImmutableFieldsUnchanged(['userId', 'createdAt']);
+      allow delete: if isAuthenticated() && isDocOwner();
+      
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() && isDocOwner();
+        allow create: if isAuthenticated() && 
+                      hasRequiredFields(['chatId', 'userId', 'role', 'content', 'createdAt']) &&
+                      isValidMessage(request.resource.data) && 
+                      uidUnchanged() &&
+                      request.resource.data.chatId == chatId;
+        allow update: if isAuthenticated() && 
+                      isDocOwner() &&
+                      hasRequiredFields(['chatId', 'userId', 'role', 'content', 'createdAt']) &&
+                      isValidMessage(request.resource.data) && 
+                      uidNotModified() &&
+                      areImmutableFieldsUnchanged(['chatId', 'userId', 'createdAt']);
+        allow delete: if isAuthenticated() && isDocOwner();
+      }
+    }
+  }
+}

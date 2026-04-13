@@ -1,0 +1,121 @@
+{
+  "entities": {
+    "Chat": {
+      "title": "Chat",
+      "description": "A chat session with the Nexus AI Assistant",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user who owns the chat"
+        },
+        "title": {
+          "type": "string",
+          "description": "The title of the chat"
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "description": "When the chat was created"
+        },
+        "updatedAt": {
+          "type": "timestamp",
+          "description": "When the chat was last updated"
+        }
+      },
+      "required": ["userId", "title", "createdAt", "updatedAt"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A message within a chat session",
+      "type": "object",
+      "properties": {
+        "chatId": {
+          "type": "string",
+          "description": "The ID of the chat this message belongs to"
+        },
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user who owns the message"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["user", "model"],
+          "description": "The role of the message sender"
+        },
+        "content": {
+          "type": "string",
+          "description": "The text content of the message"
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "description": "When the message was created"
+        }
+      },
+      "required": ["chatId", "userId", "role", "content", "createdAt"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "A task or activity for the user",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user who owns the task"
+        },
+        "title": {
+          "type": "string",
+          "description": "The title of the task"
+        },
+        "description": {
+          "type": "string",
+          "description": "The description of the task"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "completed"],
+          "description": "The status of the task"
+        },
+        "dueDate": {
+          "type": "timestamp",
+          "description": "The due date of the task"
+        },
+        "isRecurring": {
+          "type": "boolean",
+          "description": "Whether the task repeats"
+        },
+        "recurrenceInterval": {
+          "type": "string",
+          "enum": ["daily", "weekly", "monthly", "custom"],
+          "description": "How often the task repeats"
+        },
+        "recurrenceValue": {
+          "type": "integer",
+          "description": "The value for custom recurrence intervals"
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "description": "When the task was created"
+        },
+        "updatedAt": {
+          "type": "timestamp",
+          "description": "When the task was last updated"
+        }
+      },
+      "required": ["userId", "title", "status", "isRecurring", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/chats/{chatId}": {
+      "schema": { "$ref": "#/entities/Chat" },
+      "description": "Stores user chat sessions"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Stores messages within a chat session"
+    },
+    "/tasks/{taskId}": {
+      "schema": { "$ref": "#/entities/Task" },
+      "description": "Stores user tasks and recurring activities"
+    }
+  }
+}

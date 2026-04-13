@@ -1,0 +1,7 @@
+{
+  "name": "NexusLM UI",
+  "description": "Frontend UI for NexusLM: Advanced AI-First Knowledge Operating System",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
